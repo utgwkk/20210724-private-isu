@@ -606,6 +606,7 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		"imageURL": imageURL,
 	}
 	w.Header().Add("Etag", getEtag(false))
+	w.Header().Add("Cache-Control", "public, max-age=1")
 
 	template.Must(template.New("posts.html").Funcs(fmap).ParseFiles(
 		getTemplPath("posts.html"),
