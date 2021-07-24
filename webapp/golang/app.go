@@ -332,6 +332,11 @@ func getTemplPath(filename string) string {
 
 func getInitialize(w http.ResponseWriter, r *http.Request) {
 	dbInitialize()
+	var allUsers []User
+	db.Select(&allUsers, "SELECT * FROM user")
+	for _, u := range allUsers {
+		userCache.Store(u.ID, u)
+	}
 	w.WriteHeader(http.StatusOK)
 }
 
