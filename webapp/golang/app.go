@@ -685,38 +685,6 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }
 
-func getImage(w http.ResponseWriter, r *http.Request) {
-	pidStr := pat.Param(r, "id")
-	pid, err := strconv.Atoi(pidStr)
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-
-	post := Post{}
-	err = db.Get(&post, "SELECT * FROM `posts` WHERE `id` = ?", pid)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-
-	ext := pat.Param(r, "ext")
-
-	if ext == "jpg" && post.Mime == "image/jpeg" ||
-		ext == "png" && post.Mime == "image/png" ||
-		ext == "gif" && post.Mime == "image/gif" {
-		w.Header().Set("Content-Type", post.Mime)
-		_, err := w.Write(post.Imgdata)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-		return
-	}
-
-	w.WriteHeader(http.StatusNotFound)
-}
-
 func postComment(w http.ResponseWriter, r *http.Request) {
 	me := getSessionUser(r)
 	if !isLogin(me) {
@@ -881,7 +849,6 @@ func main() {
 	mux.HandleFunc(pat.Get("/posts"), getPosts)
 	mux.HandleFunc(pat.Get("/posts/:id"), getPostsID)
 	mux.HandleFunc(pat.Post("/"), postIndex)
-	mux.HandleFunc(pat.Get("/image/:id.:ext"), getImage)
 	mux.HandleFunc(pat.Post("/comment"), postComment)
 	mux.HandleFunc(pat.Get("/admin/banned"), getAdminBanned)
 	mux.HandleFunc(pat.Post("/admin/banned"), postAdminBanned)
