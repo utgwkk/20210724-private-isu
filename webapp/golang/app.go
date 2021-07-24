@@ -679,7 +679,7 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 	} else if mime == "image/gif" {
 		ext = ".gif"
 	}
-	savePath := fmt.Sprintf("/home/isucon/private_isu/webapp/public/%d.%s", pid, ext)
+	savePath := fmt.Sprintf("/home/isucon/private_isu/webapp/public/image/%d%s", pid, ext)
 	ioutil.WriteFile(savePath, filedata, 0644)
 
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
