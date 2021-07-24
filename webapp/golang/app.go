@@ -191,14 +191,26 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		return nil, err
 	}
 	commentsByPostID := make(map[int][]Comment)
+	commentsCountByPostID := make(map[int]int)
 	for _, c := range comments {
 		commentsByPostID[c.PostID] = append(commentsByPostID[c.PostID], c)
+	}
+	for pid, cs := range commentsByPostID {
+		commentsCountByPostID[pid] = len(cs)
+		if !allComments && len(cs) > 3 {
+			commentsByPostID[pid] = commentsByPostID[pid][:3]
+		}
 	}
 
 	var users []User
 	userIDs := []int{0}
 	for _, p := range results {
 		userIDs = append(userIDs, p.UserID)
+	}
+	for _, cs := range commentsByPostID {
+		for _, c := range cs {
+			userIDs = append(userIDs, c.UserID)
+		}
 	}
 	query, args, err = sqlx.In("SELECT * FROM `users` WHERE `id` IN (?)", userIDs)
 	if err != nil {
@@ -214,18 +226,12 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 	}
 
 	for _, p := range results {
-		p.CommentCount = len(commentsByPostID[p.ID])
+		p.CommentCount = commentsCountByPostID[p.ID]
 
 		comments := commentsByPostID[p.ID]
-		if !allComments && len(comments) > 3 {
-			comments = comments[:3]
-		}
 
 		for i := 0; i < len(comments); i++ {
-			err := db.Get(&comments[i].User, "SELECT * FROM `users` WHERE `id` = ?", comments[i].UserID)
-			if err != nil {
-				return nil, err
-			}
+			comments[i].User = userByUserID[comments[i].UserID]
 		}
 
 		// reverse
