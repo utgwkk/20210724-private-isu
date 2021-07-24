@@ -512,6 +512,13 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 	}{posts, me, getCSRFToken(r), getFlash(w, r, "notice")})
 }
 
+var accountTmpl = template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
+	getTemplPath("layout.html"),
+	getTemplPath("user.html"),
+	getTemplPath("posts.html"),
+	getTemplPath("post.html"),
+))
+
 func getAccountName(w http.ResponseWriter, r *http.Request) {
 	accountName := strings.TrimPrefix(pat.Param(r, "accountName"), "@")
 	user := User{}
@@ -560,16 +567,7 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 
 	me := getSessionUser(r)
 
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
-		getTemplPath("layout.html"),
-		getTemplPath("user.html"),
-		getTemplPath("posts.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, struct {
+	accountTmpl.Execute(w, struct {
 		Posts          []Post
 		User           User
 		PostCount      int
@@ -578,6 +576,11 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 		Me             User
 	}{posts, user, postCount, commentCount, commentedCount, me})
 }
+
+var postsTmpl = template.Must(template.New("posts.html").Funcs(fmap).ParseFiles(
+	getTemplPath("posts.html"),
+	getTemplPath("post.html"),
+))
 
 func getPosts(w http.ResponseWriter, r *http.Request) {
 	m, err := url.ParseQuery(r.URL.RawQuery)
@@ -615,15 +618,14 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("posts.html").Funcs(fmap).ParseFiles(
-		getTemplPath("posts.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, posts)
+	postsTmpl.Execute(w, posts)
 }
+
+var postsIDtmpl = template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
+	getTemplPath("layout.html"),
+	getTemplPath("post_id.html"),
+	getTemplPath("post.html"),
+))
 
 func getPostsID(w http.ResponseWriter, r *http.Request) {
 	pidStr := pat.Param(r, "id")
@@ -655,15 +657,7 @@ func getPostsID(w http.ResponseWriter, r *http.Request) {
 
 	me := getSessionUser(r)
 
-	fmap := template.FuncMap{
-		"imageURL": imageURL,
-	}
-
-	template.Must(template.New("layout.html").Funcs(fmap).ParseFiles(
-		getTemplPath("layout.html"),
-		getTemplPath("post_id.html"),
-		getTemplPath("post.html"),
-	)).Execute(w, struct {
+	postsIDtmpl.Execute(w, struct {
 		Post Post
 		Me   User
 	}{p, me})
