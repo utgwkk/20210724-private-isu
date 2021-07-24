@@ -446,6 +446,12 @@ func postRegister(w http.ResponseWriter, r *http.Request) {
 	session.Values["csrf_token"] = secureRandomStr(16)
 	session.Save(r, w)
 
+	userCache.Store(int(uid), User{
+		ID:          int(uid),
+		AccountName: accountName,
+		DelFlg:      0,
+	})
+
 	http.Redirect(w, r, "/", http.StatusFound)
 }
 
