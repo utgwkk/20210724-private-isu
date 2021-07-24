@@ -144,7 +144,7 @@ func getSession(r *http.Request) *sessions.Session {
 	return session
 }
 
-var sessionUserCache sync.Map
+var userCache sync.Map
 
 func getSessionUser(r *http.Request) User {
 	session := getSession(r)
@@ -153,7 +153,7 @@ func getSessionUser(r *http.Request) User {
 		return User{}
 	}
 
-	uCache, ok := sessionUserCache.Load(uid)
+	uCache, ok := userCache.Load(uid)
 	if ok {
 		return uCache.(User)
 	}
@@ -165,9 +165,41 @@ func getSessionUser(r *http.Request) User {
 		return User{}
 	}
 
-	sessionUserCache.Store(uid, u)
+	userCache.Store(uid, u)
 
 	return u
+}
+
+func getUsersByIDs(userIDs []int) (users []User, err error) {
+	var notFoundUserIDs []int
+	for _, id := range userIDs {
+		u, ok := userCache.Load(id)
+		if ok {
+			users = append(users, u.(User))
+		} else {
+			notFoundUserIDs = append(notFoundUserIDs, id)
+		}
+	}
+
+	if len(notFoundUserIDs) == 0 {
+		return
+	}
+	query, args, err := sqlx.In("SELECT * FROM `users` WHERE `id` IN (?)", userIDs)
+	if err != nil {
+		return nil, err
+	}
+	var usersFromDB []User
+	err = db.Select(&usersFromDB, query, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, u := range usersFromDB {
+		userCache.Store(u.ID, u)
+	}
+
+	users = append(users, usersFromDB...)
+	return
 }
 
 func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
@@ -211,8 +243,7 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		}
 	}
 
-	var users []User
-	userIDs := []int{0}
+	userIDs := []int{}
 	for _, p := range results {
 		userIDs = append(userIDs, p.UserID)
 	}
@@ -221,11 +252,7 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 			userIDs = append(userIDs, c.UserID)
 		}
 	}
-	query, args, err = sqlx.In("SELECT * FROM `users` WHERE `id` IN (?)", userIDs)
-	if err != nil {
-		return nil, err
-	}
-	err = db.Select(&users, query, args...)
+	users, err := getUsersByIDs(userIDs)
 	if err != nil {
 		return nil, err
 	}
