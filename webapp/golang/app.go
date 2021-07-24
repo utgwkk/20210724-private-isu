@@ -177,6 +177,24 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
 	var posts []Post
 
+	var users []User
+	userIDs := []int{0}
+	for _, p := range results {
+		userIDs = append(userIDs, p.UserID)
+	}
+	query, args, err := sqlx.In("SELECT * FROM `users` WHERE `id` IN (?)", userIDs)
+	if err != nil {
+		return nil, err
+	}
+	err = db.Select(&users, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	userByUserID := make(map[int]User)
+	for _, u := range users {
+		userByUserID[u.ID] = u
+	}
+
 	for _, p := range results {
 		err := db.Get(&p.CommentCount, "SELECT COUNT(*) AS `count` FROM `comments` WHERE `post_id` = ?", p.ID)
 		if err != nil {
@@ -207,10 +225,7 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 
 		p.Comments = comments
 
-		err = db.Get(&p.User, "SELECT * FROM `users` WHERE `id` = ?", p.UserID)
-		if err != nil {
-			return nil, err
-		}
+		p.User = userByUserID[p.UserID]
 
 		p.CSRFToken = csrfToken
 
