@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	crand "crypto/rand"
-	"crypto/sha1"
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
@@ -18,7 +17,6 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
@@ -70,40 +68,6 @@ type Comment struct {
 	Comment   string    `db:"comment"`
 	CreatedAt time.Time `db:"created_at"`
 	User      User
-}
-
-type LastModified struct {
-	LastModified time.Time
-	sync.RWMutex
-}
-
-var modified = LastModified{
-	LastModified: time.Now(),
-}
-
-func refreshLastModified() {
-	modified.Lock()
-	defer modified.Unlock()
-	modified.LastModified = time.Now()
-}
-
-func getLastModified() time.Time {
-	modified.RLock()
-	defer modified.RUnlock()
-	return modified.LastModified
-}
-
-func getEtag(loggedIn bool) string {
-	loggedInStr := ""
-	if loggedIn {
-		loggedInStr = "logged_in"
-	}
-	modified.RLock()
-	lastModifiedStr := modified.LastModified.String()
-	modified.RUnlock()
-	value := fmt.Sprintf("%s:%s", lastModifiedStr, loggedInStr)
-	sum := sha1.Sum([]byte(value))
-	return hex.EncodeToString(sum[:])
 }
 
 func init() {
@@ -562,11 +526,6 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 }
 
 func getPosts(w http.ResponseWriter, r *http.Request) {
-	etag := r.Header.Get("Etag")
-	if etag == getEtag(false) {
-		w.WriteHeader(http.StatusNotModified)
-		return
-	}
 	m, err := url.ParseQuery(r.URL.RawQuery)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -605,7 +564,6 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 	fmap := template.FuncMap{
 		"imageURL": imageURL,
 	}
-	w.Header().Add("Etag", getEtag(false))
 
 	template.Must(template.New("posts.html").Funcs(fmap).ParseFiles(
 		getTemplPath("posts.html"),
@@ -743,8 +701,6 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 	savePath := fmt.Sprintf("/home/isucon/private_isu/webapp/public/image/%d%s", pid, ext)
 	ioutil.WriteFile(savePath, filedata, 0644)
 
-	refreshLastModified()
-
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }
 
@@ -772,8 +728,6 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 		log.Print(err)
 		return
 	}
-
-	refreshLastModified()
 
 	http.Redirect(w, r, fmt.Sprintf("/posts/%d", postID), http.StatusFound)
 }
@@ -835,8 +789,6 @@ func postAdminBanned(w http.ResponseWriter, r *http.Request) {
 	for _, id := range r.Form["uid[]"] {
 		db.Exec(query, 1, id)
 	}
-
-	refreshLastModified()
 
 	http.Redirect(w, r, "/admin/banned", http.StatusFound)
 }
