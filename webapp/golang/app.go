@@ -42,12 +42,13 @@ const (
 )
 
 type User struct {
-	ID          int       `db:"id"`
-	AccountName string    `db:"account_name"`
-	Passhash    string    `db:"passhash"`
-	Authority   int       `db:"authority"`
-	DelFlg      int       `db:"del_flg"`
-	CreatedAt   time.Time `db:"created_at"`
+	ID             int       `db:"id"`
+	AccountName    string    `db:"account_name"`
+	Passhash       string    `db:"passhash"`
+	CommentedCount int       `db:"commented_count"`
+	Authority      int       `db:"authority"`
+	DelFlg         int       `db:"del_flg"`
+	CreatedAt      time.Time `db:"created_at"`
 }
 
 type Post struct {
@@ -88,10 +89,20 @@ func dbInitialize() {
 		"DELETE FROM comments WHERE id > 100000",
 		"UPDATE users SET del_flg = 0",
 		"UPDATE users SET del_flg = 1 WHERE id % 50 = 0",
+		"UPDATE users SET commented_count = 0",
 	}
 
 	for _, sql := range sqls {
 		db.Exec(sql)
+	}
+
+	var commentedCounts []struct {
+		UserID         int `db:"user_id"`
+		CommentedCount int `db:"commented_count"`
+	}
+	db.Select(&commentedCounts, "SELECT p.user_id, COUNT(c.id) AS commented_count FROM posts p LEFT JOIN comments c ON p.id = c.post_id GROUP BY p.user_id")
+	for _, cc := range commentedCounts {
+		db.Exec("UPDATE users SET commented_count = ? WHERE id = ?", cc.CommentedCount, cc.UserID)
 	}
 }
 
@@ -493,20 +504,7 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 	}
 	postCount := len(postIDs)
 
-	commentedCount := 0
-	if postCount > 0 {
-		query, args, err := sqlx.In("SELECT COUNT(*) AS count FROM `comments` WHERE `post_id` IN (?)", postIDs)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-
-		err = db.Get(&commentedCount, query, args...)
-		if err != nil {
-			log.Print(err)
-			return
-		}
-	}
+	commentedCount := user.CommentedCount
 
 	me := getSessionUser(r)
 
@@ -726,8 +724,20 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	txn, err := db.Begin()
+	defer txn.Rollback()
+	if err != nil {
+		log.Print(err)
+		return
+	}
 	query := "INSERT INTO `comments` (`post_id`, `user_id`, `comment`) VALUES (?,?,?)"
-	_, err = db.Exec(query, postID, me.ID, r.FormValue("comment"))
+	_, err = txn.Exec(query, postID, me.ID, r.FormValue("comment"))
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	_, err = txn.Exec("UPDATE users SET commented_count = commented_count + 1 WHERE id = (SELECT user_id FROM posts WHERE id = ?)", postID)
 	if err != nil {
 		log.Print(err)
 		return
