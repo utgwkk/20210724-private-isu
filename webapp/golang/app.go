@@ -17,6 +17,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bradfitz/gomemcache/memcache"
@@ -134,11 +135,18 @@ func getSession(r *http.Request) *sessions.Session {
 	return session
 }
 
+var sessionUserCache sync.Map
+
 func getSessionUser(r *http.Request) User {
 	session := getSession(r)
 	uid, ok := session.Values["user_id"]
 	if !ok || uid == nil {
 		return User{}
+	}
+
+	uCache, ok := sessionUserCache.Load(uid)
+	if ok {
+		return uCache.(User)
 	}
 
 	u := User{}
@@ -147,6 +155,8 @@ func getSessionUser(r *http.Request) User {
 	if err != nil {
 		return User{}
 	}
+
+	sessionUserCache.Store(uid, u)
 
 	return u
 }
