@@ -331,6 +331,16 @@ func getTemplPath(filename string) string {
 }
 
 func getInitialize(w http.ResponseWriter, r *http.Request) {
+	var newPosts []Post
+	db.Select(&newPosts, "SELECT * FROM posts WHERE id > 10000")
+	for _, p := range newPosts {
+		imagePath := "/home/isucon/private_isu/webapp/public" + imageURL(p)
+		err := os.Remove(imagePath)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	dbInitialize()
 	var allUsers []User
 	db.Select(&allUsers, "SELECT * FROM user")
