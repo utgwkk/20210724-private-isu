@@ -43,6 +43,7 @@ type User struct {
 	ID             int       `db:"id"`
 	AccountName    string    `db:"account_name"`
 	Passhash       string    `db:"passhash"`
+	PostCount      int       `db:"post_count"`
 	CommentedCount int       `db:"commented_count"`
 	Authority      int       `db:"authority"`
 	DelFlg         int       `db:"del_flg"`
@@ -87,11 +88,20 @@ func dbInitialize() {
 		"DELETE FROM comments WHERE id > 100000",
 		"UPDATE users SET del_flg = 0",
 		"UPDATE users SET del_flg = 1 WHERE id % 50 = 0",
-		"UPDATE users SET commented_count = 0",
+		"UPDATE users SET post_count = 0, commented_count = 0",
 	}
 
 	for _, sql := range sqls {
 		db.Exec(sql)
+	}
+
+	var postCounts []struct {
+		UserID    int `db:"user_id"`
+		PostCount int `db:"post_count"`
+	}
+	db.Select(&postCounts, "SELECT user_id, COUNT(*) AS post_count FROM posts GROUP BY user_id")
+	for _, pc := range postCounts {
+		db.Exec("UPDATE users SET post_count = ? WHERE id = ?", pc.PostCount, pc.UserID)
 	}
 
 	var commentedCounts []struct {
@@ -558,12 +568,7 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var postCount int
-	err = db.Select(&postCount, "SELECT COUNT(*) FROM `posts` WHERE `user_id` = ?", user.ID)
-	if err != nil {
-		log.Print(err)
-		return
-	}
+	postCount := user.PostCount
 
 	commentedCount := user.CommentedCount
 
@@ -722,8 +727,14 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	txn, err := db.Begin()
+	defer txn.Rollback()
+	if err != nil {
+		log.Print(err)
+		return
+	}
 	query := "INSERT INTO `posts` (`user_id`, `mime`, `body`) VALUES (?,?,?)"
-	result, err := db.Exec(
+	result, err := txn.Exec(
 		query,
 		me.ID,
 		mime,
@@ -750,6 +761,18 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	savePath := fmt.Sprintf("/home/isucon/private_isu/webapp/public/image/%d%s", pid, ext)
 	ioutil.WriteFile(savePath, filedata, 0644)
+
+	_, err = txn.Exec("UPDATE users SET post_count = post_count + 1 WHERE id = ?", me.ID)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	err = txn.Commit()
+	if err != nil {
+		log.Print(err)
+		return
+	}
 
 	http.Redirect(w, r, "/posts/"+strconv.FormatInt(pid, 10), http.StatusFound)
 }
