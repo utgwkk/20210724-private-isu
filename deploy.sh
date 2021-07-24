@@ -19,4 +19,8 @@ sudo systemctl reload nginx
 sudo cp webapp/etc/mysql/conf.d/my.cnf /etc/mysql/conf.d/my.cnf
 sudo systemctl restart mysql
 
+# deploy memcached config
+sudo cp webapp/etc/memcached.conf /etc/memcached.conf
+sudo systemctl restart memcached
+
 cd -
