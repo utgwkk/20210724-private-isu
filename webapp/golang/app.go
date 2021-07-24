@@ -342,6 +342,9 @@ func getInitialize(w http.ResponseWriter, r *http.Request) {
 	}
 
 	dbInitialize()
+
+	// reset cache
+	userCache = sync.Map{}
 	var allUsers []User
 	db.Select(&allUsers, "SELECT * FROM user")
 	for _, u := range allUsers {
