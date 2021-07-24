@@ -1,6 +1,8 @@
 #!/bin/sh
 set -ex
 
+git pull
+
 # deploy webapp
 cd webapp/golang
 make
