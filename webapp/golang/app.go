@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	crand "crypto/rand"
 	"crypto/sha512"
 	"encoding/hex"
@@ -27,7 +26,6 @@ import (
 	"github.com/jmoiron/sqlx"
 	goji "goji.io"
 	"goji.io/pat"
-	"goji.io/pattern"
 )
 
 var (
@@ -807,31 +805,6 @@ func postAdminBanned(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/admin/banned", http.StatusFound)
 }
 
-type RegexpPattern struct {
-	regexp *regexp.Regexp
-}
-
-func Regexp(reg *regexp.Regexp) *RegexpPattern {
-	return &RegexpPattern{regexp: reg}
-}
-
-func (reg *RegexpPattern) Match(r *http.Request) *http.Request {
-	ctx := r.Context()
-	uPath := pattern.Path(ctx)
-	if reg.regexp.MatchString(uPath) {
-		values := reg.regexp.FindStringSubmatch(uPath)
-		keys := reg.regexp.SubexpNames()
-
-		for i := 1; i < len(keys); i++ {
-			ctx = context.WithValue(ctx, pattern.Variable(keys[i]), values[i])
-		}
-
-		return r.WithContext(ctx)
-	}
-
-	return nil
-}
-
 func main() {
 	host := os.Getenv("ISUCONP_DB_HOST")
 	if host == "" {
@@ -885,7 +858,7 @@ func main() {
 	mux.HandleFunc(pat.Post("/comment"), postComment)
 	mux.HandleFunc(pat.Get("/admin/banned"), getAdminBanned)
 	mux.HandleFunc(pat.Post("/admin/banned"), postAdminBanned)
-	mux.HandleFunc(Regexp(regexp.MustCompile(`^/@(?P<accountName>[a-zA-Z]+)$`)), getAccountName)
+	mux.HandleFunc(pat.Get("/@:accountName"), getAccountName)
 	mux.Handle(pat.Get("/*"), http.FileServer(http.Dir("../public")))
 
 	log.Fatal(http.ListenAndServe(":8080", mux))
