@@ -51,7 +51,6 @@ type User struct {
 type Post struct {
 	ID           int       `db:"id"`
 	UserID       int       `db:"user_id"`
-	Imgdata      []byte    `db:"imgdata"`
 	Body         string    `db:"body"`
 	Mime         string    `db:"mime"`
 	CreatedAt    time.Time `db:"created_at"`
@@ -652,12 +651,11 @@ func postIndex(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := "INSERT INTO `posts` (`user_id`, `mime`, `imgdata`, `body`) VALUES (?,?,?,?)"
+	query := "INSERT INTO `posts` (`user_id`, `mime`, `body`) VALUES (?,?,?)"
 	result, err := db.Exec(
 		query,
 		me.ID,
 		mime,
-		[]byte{}, // TODO: DROP COLUMN imgdata したい
 		r.FormValue("body"),
 	)
 	if err != nil {
