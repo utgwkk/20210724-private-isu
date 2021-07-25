@@ -44,6 +44,7 @@ type User struct {
 	AccountName    string    `db:"account_name"`
 	Passhash       string    `db:"passhash"`
 	PostCount      int       `db:"post_count"`
+	CommentCount   int       `db:"comment_count"`
 	CommentedCount int       `db:"commented_count"`
 	Authority      int       `db:"authority"`
 	DelFlg         int       `db:"del_flg"`
@@ -88,7 +89,7 @@ func dbInitialize() {
 		"DELETE FROM comments WHERE id > 100000",
 		"UPDATE users SET del_flg = 0",
 		"UPDATE users SET del_flg = 1 WHERE id % 50 = 0",
-		"UPDATE users SET post_count = 0, commented_count = 0",
+		"UPDATE users SET post_count = 0, comment_count = 0, commented_count = 0",
 	}
 
 	for _, sql := range sqls {
@@ -102,6 +103,15 @@ func dbInitialize() {
 	db.Select(&postCounts, "SELECT user_id, COUNT(*) AS post_count FROM posts GROUP BY user_id")
 	for _, pc := range postCounts {
 		db.Exec("UPDATE users SET post_count = ? WHERE id = ?", pc.PostCount, pc.UserID)
+	}
+
+	var commentCounts []struct {
+		UserID       int `db:"user_id"`
+		CommentCount int `db:"comment_count"`
+	}
+	db.Select(&commentCounts, "SELECT user_id, COUNT(*) AS comment_count FROM comments GROUP BY user_id")
+	for _, cc := range commentCounts {
+		db.Exec("UPDATE users SET comment_count = ? WHERE id = ?", cc.CommentCount, cc.UserID)
 	}
 
 	var commentedCounts []struct {
@@ -561,12 +571,7 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	commentCount := 0
-	err = db.Get(&commentCount, "SELECT COUNT(*) AS count FROM `comments` WHERE `user_id` = ?", user.ID)
-	if err != nil {
-		log.Print(err)
-		return
-	}
+	commentCount := user.CommentCount
 
 	postCount := user.PostCount
 
@@ -809,6 +814,12 @@ func postComment(w http.ResponseWriter, r *http.Request) {
 	}
 
 	_, err = txn.Exec("UPDATE users SET commented_count = commented_count + 1 WHERE id = (SELECT user_id FROM posts WHERE id = ?)", postID)
+	if err != nil {
+		log.Print(err)
+		return
+	}
+
+	_, err = txn.Exec("UPDATE users SET comment_count = comment_count + 1 WHERE id = ?", me.ID)
 	if err != nil {
 		log.Print(err)
 		return
