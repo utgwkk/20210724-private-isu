@@ -239,7 +239,7 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 }
 
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
-	posts := make([]Post, postsPerPage)
+	var posts []Post
 
 	var comments []Comment
 	postIDs := []int{0}
@@ -284,7 +284,7 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 		userByUserID[u.ID] = u
 	}
 
-	for idx, p := range results {
+	for _, p := range results {
 		p.CommentCount = commentsCountByPostID[p.ID]
 
 		comments := commentsByPostID[p.ID]
@@ -304,7 +304,12 @@ func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, erro
 
 		p.CSRFToken = csrfToken
 
-		posts[idx] = p
+		if p.User.DelFlg == 0 {
+			posts = append(posts, p)
+		}
+		if len(posts) >= postsPerPage {
+			break
+		}
 	}
 
 	return posts, nil
