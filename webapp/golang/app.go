@@ -536,13 +536,13 @@ func getAccountName(w http.ResponseWriter, r *http.Request) {
 	accountName := strings.TrimPrefix(pat.Param(r, "accountName"), "@")
 	user := User{}
 
-	err := db.Get(&user, "SELECT * FROM `users` WHERE `account_name` = ? AND `del_flg` = 0", accountName)
+	err := db.Get(&user, "SELECT * FROM `users` WHERE `account_name` = ?", accountName)
 	if err != nil {
 		log.Print(err)
 		return
 	}
 
-	if user.ID == 0 {
+	if user.ID == 0 || user.DelFlg == 1 {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
