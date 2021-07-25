@@ -139,9 +139,11 @@ func tryLogin(accountName, password string) *User {
 	}
 }
 
+var userRe = regexp.MustCompile(`\A[0-9a-zA-Z_]{3,}\z`)
+var passwordRe = regexp.MustCompile(`\A[0-9a-zA-Z_]{6,}\z`)
+
 func validateUser(accountName, password string) bool {
-	return regexp.MustCompile(`\A[0-9a-zA-Z_]{3,}\z`).MatchString(accountName) &&
-		regexp.MustCompile(`\A[0-9a-zA-Z_]{6,}\z`).MatchString(password)
+	return userRe.MatchString(accountName) && passwordRe.MatchString(password)
 }
 
 func digest(src string) string {
