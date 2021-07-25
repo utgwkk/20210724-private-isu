@@ -86,6 +86,7 @@ func dbInitialize() {
 	sqls := []string{
 		"DELETE FROM users WHERE id > 1000",
 		"DELETE FROM posts WHERE id > 10000",
+		"DELETE FROM banned_user_posts WHERE id > 10000",
 		"DELETE FROM comments WHERE id > 100000",
 		"UPDATE users SET del_flg = 0",
 		"UPDATE users SET del_flg = 1 WHERE id % 50 = 0",
@@ -515,7 +516,7 @@ func getIndex(w http.ResponseWriter, r *http.Request) {
 
 	results := []Post{}
 
-	err := db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` ORDER BY `created_at` DESC LIMIT ?", postsPerPage+5)
+	err := db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` ORDER BY `created_at` DESC LIMIT ?", postsPerPage)
 	if err != nil {
 		log.Print(err)
 		return
@@ -613,7 +614,7 @@ func getPosts(w http.ResponseWriter, r *http.Request) {
 	}
 
 	results := []Post{}
-	err = db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC LIMIT ?", t.Format(ISO8601Format), postsPerPage+5)
+	err = db.Select(&results, "SELECT `id`, `user_id`, `body`, `mime`, `created_at` FROM `posts` WHERE `created_at` <= ? ORDER BY `created_at` DESC LIMIT ?", t.Format(ISO8601Format), postsPerPage)
 	if err != nil {
 		log.Print(err)
 		return
@@ -890,6 +891,8 @@ func postAdminBanned(w http.ResponseWriter, r *http.Request) {
 
 	for _, id := range r.Form["uid[]"] {
 		db.Exec(query, 1, id)
+		db.Exec("INSERT INTO banned_user_posts SELECT * FROM posts WHERE user_id = ?", id)
+		db.Exec("DELETE FROM posts WHERE user_id = ?", id)
 	}
 
 	http.Redirect(w, r, "/admin/banned", http.StatusFound)
