@@ -239,10 +239,14 @@ func getFlash(w http.ResponseWriter, r *http.Request, key string) string {
 }
 
 func makePosts(results []Post, csrfToken string, allComments bool) ([]Post, error) {
+	if len(results) == 0 {
+		return []Post{}, nil
+	}
+
 	posts := make([]Post, 0, postsPerPage)
 
 	var comments []Comment
-	postIDs := []int{0}
+	postIDs := make([]int, 0, postsPerPage)
 	for _, p := range results {
 		postIDs = append(postIDs, p.ID)
 	}
